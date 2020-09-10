@@ -1,0 +1,48 @@
+cabal-version:      2.2
+name:               lsp-network
+version:            0.1.0.0
+synopsis:           A simple LSP wrapper that help you run server remotely.
+description:        Please see the README on Github at
+                    <https://github.com/4eUeP/lsp-network#readme>
+license:            BSD-3-Clause
+license-file:       LICENSE
+copyright:          Copyright (c)
+author:             mu
+maintainer:         laxcatmu@gmail.com
+tested-with:        GHC == 8.10.2, GHC == 8.8.4, GHC == 8.6.5
+category:           Development
+homepage:           https://github.com/4eUeP/lsp-network
+bug-reports:        https://github.com/4eUeP/lsp-network/issues
+build-type:         Simple
+extra-source-files: README.md
+                    ChangeLog.md
+
+source-repository head
+  type:     git
+  location: https://github.com/4eUeP/lsp-network
+
+library
+  hs-source-dirs:   src
+  build-depends:    base >= 4.11 && < 5
+  default-language: Haskell2010
+  ghc-options:      -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+
+executable lsp-network
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  build-depends:    base >= 4.11 && < 5
+  default-language: Haskell2010
+  ghc-options:      -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+
+test-suite lsp-network-test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  hs-source-dirs:     test
+  build-depends:      base >= 4.11 && < 5, hspec, lsp-network
+  default-language:   Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover == 2.*
+  ghc-options:        -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                      -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+                      -threaded -rtsopts -with-rtsopts=-N
