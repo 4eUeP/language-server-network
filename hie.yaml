@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "app/server.hs"
+      component: "lsp-network:exe:lsp-network-server"
+
+    - path: "app/client.hs"
+      component: "lsp-network:exe:lsp-network-client"
+
+    - path: "src"
+      component: "lib:lsp-network"

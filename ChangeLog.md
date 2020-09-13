@@ -1,3 +1,6 @@
-# Changelog for lsp-network
+ChangeLog
+=========
 
-## Unreleased changes
+## 0.1.0.0
+
+Initially released.
