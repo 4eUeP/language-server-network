@@ -32,7 +32,6 @@ Also there is an example of config file is on `app/client.example.yaml`
 
 - Enable TLS.
 - Enable password proteced connection.
-- Logging
 - [?] A builtin sync feature.
 
 
