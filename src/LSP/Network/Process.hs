@@ -4,6 +4,7 @@ module LSP.Network.Process
   ( runLangServer
   ) where
 
+import           Control.Monad.IO.Class        (MonadIO, liftIO)
 import           Control.Monad     (liftM2)
 import           System.Directory  (doesDirectoryExist, findExecutable)
 import           System.IO         (Handle)
@@ -14,12 +15,12 @@ import           LSP.Network.Types (Project (..))
 
 -------------------------------------------------------------------------------
 
-runLangServer :: Project -> (Handle -> Handle -> IO a) -> IO a
+runLangServer :: MonadIO m => Project -> (Handle -> Handle -> IO a) -> m a
 runLangServer p@Project{..} hdl = do
-  checkResult <- checkProject p
+  checkResult <- liftIO $ checkProject p
   case checkResult of
     Left errmsg -> error errmsg
-    Right _ -> do
+    Right _ -> liftIO $ do
       let process =
             (Proc.proc projectServerCommand projectServerCmdArgs)
               { Proc.std_out = Proc.CreatePipe

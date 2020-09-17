@@ -1,2 +1,6 @@
 host: localhost
 port: 3001
+logger:
+  handler: stdout
+  formatter: rich
+  level: info
