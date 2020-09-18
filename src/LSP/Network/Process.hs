@@ -4,14 +4,14 @@ module LSP.Network.Process
   ( runLangServer
   ) where
 
-import           Control.Monad.IO.Class        (MonadIO, liftIO)
-import           Control.Monad     (liftM2)
-import           System.Directory  (doesDirectoryExist, findExecutable)
-import           System.IO         (Handle)
-import qualified System.IO         as IO
-import qualified System.Process    as Proc
+import           Control.Monad          (liftM2)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           System.Directory       (doesDirectoryExist, findExecutable)
+import           System.IO              (Handle)
+import qualified System.IO              as IO
+import qualified System.Process         as Proc
 
-import           LSP.Network.Types (Project (..))
+import           LSP.Network.Types      (Project (..))
 
 -------------------------------------------------------------------------------
 
