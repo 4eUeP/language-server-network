@@ -6,6 +6,7 @@
 module Main (main) where
 
 import           Control.Concurrent            (forkIO)
+import           Control.Exception             (try, SomeException)
 import           Control.Monad                 (void, when)
 import           Control.Monad.IO.Class        (liftIO)
 import           Control.Monad.Reader          (ask)
@@ -13,7 +14,6 @@ import           Data.ByteString               (ByteString)
 import qualified Data.ByteString               as BS
 import           Data.ByteString.Builder.Extra (defaultChunkSize)
 import qualified Data.Text                     as Text
-import qualified Data.Text.Encoding            as Text
 import           Data.Yaml.Config              (loadYamlSettingsArgs, useEnv)
 import           Network.Socket                (Socket)
 import           Network.Socket.ByteString     (recv, sendAll)
@@ -60,22 +60,25 @@ runServer = do
 
 clientIn :: Handle -> Socket -> Maybe ByteString -> T.ServerApp ()
 clientIn hin sock m_initBS = do
-  maybe (pure ()) (onRecv) m_initBS
+  maybe (pure ()) tryWrite m_initBS
 
   untilM_ (liftIO $ recv sock 1024) $ \cin ->
     if BS.null cin
        then do Log.logInfo "Client closed."
                return False
-       else do onRecv cin
+       else do tryWrite cin
                return True
   where
-    onRecv bs = do
+    tryWrite bs = do
       isOpen <- liftIO $ IO.hIsOpen hin
       isWritable <- liftIO $ IO.hIsWritable hin
       when (isOpen && isWritable) $ do
-        Log.logDebug $ "ClientIn: " <> Text.decodeUtf8 bs
-        liftIO $ BS.hPut hin bs
-    {-# INLINE onRecv #-}
+        Log.logDebug $ "ClientIn: " <> Text.pack (show bs)
+        e_r <- liftIO $ try $ BS.hPut hin bs
+        case e_r of
+          Left e -> Log.logException (e :: SomeException)
+          _      -> return ()
+    {-# INLINE tryWrite #-}
 
 serverOut :: Handle -> Socket -> T.ServerApp ()
 serverOut hout sock = do
@@ -96,6 +99,6 @@ serverOut hout sock = do
       if BS.null sout
          then do Log.logInfo $ "Reach EOF."
                  return False
-         else do Log.logDebug $ "ServerReply: " <> Text.decodeUtf8 sout
+         else do Log.logDebug $ "ServerReply: " <> Text.pack (show sout)
                  liftIO $ sendAll sock sout
                  return True
