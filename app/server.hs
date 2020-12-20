@@ -6,7 +6,7 @@
 module Main (main) where
 
 import           Control.Concurrent            (forkIO)
-import           Control.Exception             (try, SomeException)
+import           Control.Exception             (SomeException, try)
 import           Control.Monad                 (void, when)
 import           Control.Monad.IO.Class        (liftIO)
 import           Control.Monad.Reader          (ask)
