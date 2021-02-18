@@ -53,10 +53,18 @@ runServer = do
     (e_config, m_rest) <- recvJSON sock
     case e_config of
       Left errmsg -> Log.logError $ "Parse error: " <> Text.pack errmsg
-      Right project -> do
-        runLangServer project $ \hin hout -> do
-          void . forkIO $ T.runServerApp env (clientIn hin sock m_rest)
-          T.runServerApp env (serverOut hout sock)
+      Right project -> runLSP sock project m_rest
+
+runLSP :: Socket -> T.Project -> Maybe ByteString -> T.ServerApp ()
+runLSP sock project m_rest = do
+  env <- ask
+  void $ retry (run env) (const True) 10 (10^(6 :: Int))
+  where
+    run env = do
+      Log.logInfo $ "Run LangServer with " <> (Text.pack $ show project)
+      runLangServer project $ \hin hout -> do
+        void . forkIO $ T.runServerApp env (clientIn hin sock m_rest)
+        T.runServerApp env (serverOut hout sock)
 
 clientIn :: Handle -> Socket -> Maybe ByteString -> T.ServerApp ()
 clientIn hin sock m_initBS = do

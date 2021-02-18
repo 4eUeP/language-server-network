@@ -7,5 +7,5 @@ logger:
   level: info
 projects:
   - path: /home/username/projects/your-haskell-project
-    server-cmd: haskell-language-server-wrapper
-    server-args: ["--lsp"]
+    command: haskell-language-server-wrapper
+    args: ["--lsp"]

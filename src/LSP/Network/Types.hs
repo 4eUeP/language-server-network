@@ -140,14 +140,14 @@ data Project = Project
   { projectRoot          :: FilePath
   , projectServerCommand :: FilePath
   , projectServerCmdArgs :: [String]
-  } deriving (Generic)
+  } deriving (Show, Generic)
 
 projectJsonOptions :: Aeson.Options
 projectJsonOptions = Aeson.defaultOptions { Aeson.fieldLabelModifier = flm }
   where
-    flm "projectRoot"          = "path"
-    flm "projectServerCommand" = "server-cmd"
-    flm "projectServerCmdArgs" = "server-args"
+    flm "projectRoot"          = "root"
+    flm "projectServerCommand" = "command"
+    flm "projectServerCmdArgs" = "args"
     flm x                      = x
 
 instance FromJSON Project where
