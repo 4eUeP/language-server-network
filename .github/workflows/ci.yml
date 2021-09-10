@@ -1,0 +1,76 @@
+name: ci
+
+defaults:
+  run:
+    shell: bash
+
+on: ["pull_request", "push"]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+        ghc: ["8.10.7"]
+        cabal: ["3.6"]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - uses: haskell/actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: ${{ matrix.cabal }}
+
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cabal/packages
+            ~/.cabal/store
+            dist-newstyle
+          key: "${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('**/*.cabal', '**/cabal.project') }}"
+          restore-keys: |
+            "${{ matrix.os }}-${{ matrix.ghc }}-"
+
+      - name: Build all
+        run: cabal build -O2
+
+      - name: Compress Binary
+        if: startsWith(github.ref, 'refs/tags')
+        id: compress_server_binary
+        run: |
+          version="${GITHUB_REF#refs/tags/}"
+          targets="lsp-network-server lsp-network-client simple-file-sync"
+
+          rm -rf ./artifacts && mkdir -p ./artifacts
+          for t in $targets; do
+            cp $(find dist-newstyle \( -name "$t" \) -type f) ./artifacts/$t
+          done
+
+          name=lsp-network-$version-$(uname -m)-$(uname | tr 'A-Z' 'a-z')
+          tar -zcvf $name.tar.gz -C artifacts .
+
+          echo ::set-output name=path::$name.tar.gz
+          echo ::set-output name=content_type::application/gzip
+
+      # - uses: actions/upload-artifact@v2
+      #   if: startsWith(github.ref, 'refs/tags')
+      #   with:
+      #     path: artifacts/*
+      #     name: artifacts
+
+      # - name: Upload Binary
+      #   uses: actions/upload-release-asset@v1.0.2
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ github.event.release.upload_url }}
+      #     asset_path: ${{ steps.compress_binary.outputs.path }}
+      #     asset_name: ${{ matrix.os }}-${{ steps.compress_binary.outputs.path }}
+      #     asset_content_type: ${{ steps.compress_server_binary.outputs.content_type }}
