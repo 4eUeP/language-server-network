@@ -1,39 +1,48 @@
-lsp-network
-===========
+# Language-Server-Network
 
-A small tool that help you communicate with [language server][lsp]
-through network(tcp) instead of stdio.
+A small tool that help you communicate with [language server][lsp] through
+network(tcp) instead of stdio.
 
-**N.B. You must keep your server projects synchronously with your local projects,
-including directory structure.**
+## Motivation
 
-> :star: You can use [docker volumes][docker-volumes] on server to keep the
-> same project structure as your locals. And a `rsync` to sync the projects.
-
+Do development on remote machines, but use local file editors.
 
 ## Quickstart
+
+**TODO**
+
+**N.B. You must keep your server projects synchronously with your local
+projects, including directory structure.**
+
+> :star: You can use [docker volumes][docker-volumes] on server to keep the same
+> project structure as your locals. And a SimpleFileSync to sync your projects.
+
+Setup file-sync:
+
+```
+simple-file-sync /path/to/your/config.yaml
+```
+
+An example config file:
+[simple-file-sync.yaml](./FileSystem/config/simple_file_sync.yaml)
 
 On server:
 
 ```sh
-lsp-network-server server-config.yaml
+lsp-network-server --host 0.0.0.0 --port 3001
 ```
 
-An example of config file is on `app/server.example.yaml`
+On client, set your lsp-client plugin:
 
-On client:
-
-Set your lsp server command as `lsp-network-client` with an extra option
-`client-config.yaml`.
-Also there is an example of config file is on `app/client.example.yaml`
-
+```sh
+lsp-network-client --host <your-server-ip> --port 3001 --projects lsp-network-client.yaml
+```
 
 ## TODO
 
 - Enable TLS.
 - Enable password proteced connection.
 - [?] A builtin sync feature.
-
 
 [lsp]: https://microsoft.github.io/language-server-protocol/
 [docker-volumes]: https://docs.docker.com/storage/volumes/

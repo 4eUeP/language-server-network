@@ -1,20 +1,20 @@
 cabal-version:      2.2
 name:               lsp-network
-version:            0.1.0.0
+version:            0.2.0.0
 synopsis:           A simple LSP wrapper that help you run server remotely.
 description:
   Please see the README on Github at
-  <https://github.com/4eUeP/lsp-network#readme>
+  <https://github.com/4eUeP/language-server-network#readme>
 
 license:            BSD-3-Clause
 license-file:       LICENSE
 copyright:          Copyright (c)
 author:             mu
 maintainer:         laxcatmu@gmail.com
-tested-with:        GHC ==8.8.4 || ==8.10.3
+tested-with:        GHC ==8.8.4 || ==8.10.4
 category:           Development
-homepage:           https://github.com/4eUeP/lsp-network
-bug-reports:        https://github.com/4eUeP/lsp-network/issues
+homepage:           https://github.com/4eUeP/language-server-network
+bug-reports:        https://github.com/4eUeP/language-server-network/issues
 build-type:         Simple
 extra-source-files:
   ChangeLog.md
@@ -22,98 +22,47 @@ extra-source-files:
 
 source-repository head
   type:     git
-  location: https://github.com/4eUeP/lsp-network
+  location: https://github.com/4eUeP/language-server-network
 
-library
-  exposed-modules:
-    LSP.Network
-    LSP.Network.Logging
-    LSP.Network.Types
-    LSP.Network.Utils
-
-  other-modules:
-    LSP.Network.Process
-    LSP.Network.TCP
-
-  hs-source-dirs:   src
+executable simple-file-sync
+  main-is:          SimpleFileSync.hs
+  hs-source-dirs:   app
   build-depends:
-    , aeson                 ^>=1.4
-    , base                  >=4.11    && <5
-    , bytestring            ^>=0.10
-    , co-log                ^>=0.4
-    , directory             ^>=1.3
-    , lifted-base           >=0.2
-    , monad-control         ^>=1.0
-    , mtl                   ^>=2.2
-    , network               ^>=3.1.2.0
-    , process               ^>=1.6
-    , scanner               ^>=0.3
-    , text                  ^>=1.2
-    , transformers-base     ^>=0.4
-    , unordered-containers  ^>=0.2
-    , vector                ^>=0.12
-    , Z-Data                ^>=0.6
-    , Z-IO                  ^>=0.6
+    , base             >=4.12.0.0 && <5
+    , safe-exceptions  ^>=0.1
+    , Z-Data           ^>=0.8.8
+    , Z-IO             ^>=0.8.1
+    , Z-YAML           ^>=0.3
 
   default-language: Haskell2010
-  ghc-options:
-    -Wall -Wcompat -Widentities -Wincomplete-record-updates
-    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+  ghc-options:      -threaded -Wall -fno-warn-unused-do-bind
 
 executable lsp-network-server
   main-is:          server.hs
   hs-source-dirs:   app
   build-depends:
-    , aeson                 ^>=1.4
-    , base                  >=4.11    && <5
-    , bytestring            ^>=0.10
-    , lsp-network
-    , mtl                   ^>=2.2
-    , network               ^>=3.1.2.0
-    , stm                   ^>=2.5
-    , text                  ^>=1.2
-    , unordered-containers  ^>=0.2
-    , vector                ^>=0.12
-    , yaml                  >=0.11
+    , base                  >=4.12.0.0 && <5
+    , optparse-applicative  ^>=0.16
+    , Z-Data                ^>=0.8.8
+    , Z-IO                  ^>=0.8.1
 
   default-language: Haskell2010
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -threaded -rtsopts -with-rtsopts=-N
 
 executable lsp-network-client
   main-is:          client.hs
   hs-source-dirs:   app
   build-depends:
-    , aeson                 ^>=1.4
-    , base                  >=4.11    && <5
-    , bytestring            ^>=0.10
-    , directory             ^>=1.3
-    , lsp-network
-    , mtl                   ^>=2.2
-    , network               ^>=3.1.2.0
-    , stm                   ^>=2.5
-    , text                  ^>=1.2
-    , unordered-containers  ^>=0.2
-    , vector                ^>=0.12
-    , yaml                  >=0.11
+    , base                  >=4.12.0.0 && <5
+    , optparse-applicative  ^>=0.16
+    , Z-Data                ^>=0.8.8
+    , Z-IO                  ^>=0.8.1
+    , Z-YAML                ^>=0.3
 
   default-language: Haskell2010
-  ghc-options:
-    -Wall -Wcompat -Widentities -Wincomplete-record-updates
-    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
-
-test-suite lsp-network-test
-  type:               exitcode-stdio-1.0
-  main-is:            Spec.hs
-  hs-source-dirs:     test
-  build-depends:
-    , base         >=4.11 && <5
-    , hspec
-    , lsp-network
-
-  default-language:   Haskell2010
-  build-tool-depends: hspec-discover:hspec-discover ==2.*
   ghc-options:
     -Wall -Wcompat -Widentities -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
