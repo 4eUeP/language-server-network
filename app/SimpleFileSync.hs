@@ -69,7 +69,8 @@ runRsync flagChange Project{..} = do
           ++ concatMap (\i -> ["--exclude", CBytes.fromText i]) ignores
           ++ [src_path', dest_path']
   takeMVar flagChange
-  Log.debug $ "Run: rsync with args: " <> Text.toUTF8Builder args
+  Log.debug $ "Run command: " <> "rsync "
+           <> CBytes.toBuilder (CBytes.intercalate " " args)
   (_out, err, _code) <- Proc.readProcess
     Proc.defaultProcessOptions { Proc.processFile = "rsync"
                                , Proc.processArgs = args
