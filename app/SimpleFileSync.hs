@@ -6,7 +6,7 @@
 
 module Main (main) where
 
-import           Control.Concurrent      (forkIO)
+import           Control.Concurrent      (forkIO, threadDelay)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar,
                                           tryPutMVar)
 import           Control.Exception.Safe  (tryAny)
@@ -79,9 +79,14 @@ runRsync flagChange Project{..} = do
   unless (V.null err) $ Log.fatal $ Builder.bytes err
 
 foreverRun :: IO () -> IO ()
-foreverRun f = do
-  result <- tryAny f
-  case result of
-    Left e -> do Log.fatal $ Builder.stringUTF8 (show e)
-                 foreverRun f
-    Right _ -> foreverRun f
+foreverRun = run (maxN - 1)
+  where
+    maxN = 60
+    run 0 _ = error "Error with all retries used!"
+    run n f = do
+      result <- tryAny f
+      case result of
+        Left e -> do Log.fatal $ Builder.stringUTF8 (show e)
+                     threadDelay $ ceiling $ (maxN - n) * log (maxN - n) * 10^6
+                     run (n - 1) f
+        Right _ -> run 60 f
