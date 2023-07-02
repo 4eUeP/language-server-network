@@ -10,15 +10,17 @@ module Main (main) where
 
 import           Control.Concurrent  (forkIO)
 import           Control.Exception   (SomeException, try)
+import           Data.Aeson          (FromJSON (parseJSON))
 import qualified Data.List           as List
+import qualified Data.Text           as Text
+import           Data.Yaml           (decodeFileEither, prettyPrintParseException)
 import           GHC.Generics        (Generic)
 import qualified Options.Applicative as Opt
 import qualified Z.Data.Builder      as B
-import           Z.Data.CBytes       (CBytes)
 import qualified Z.Data.CBytes       as CBytes
+import           Z.Data.CBytes       (CBytes)
 import qualified Z.Data.JSON         as JSON
 import qualified Z.Data.Vector       as V
-import qualified Z.Data.YAML         as YAML
 import qualified Z.IO.Buffered       as Buffered
 import           Z.IO.Environment    (getCWD)
 import qualified Z.IO.Logger         as Log
@@ -31,7 +33,11 @@ data Project = Project
   { root    :: CBytes
   , command :: CBytes
   , args    :: [CBytes]
-  } deriving (Show, Generic, JSON.JSON)
+  } deriving (Show, Generic, JSON.JSON, FromJSON)
+
+-- FIXME: "z-yaml" can't be built under ghc-9.2, so here we use "yaml" package
+instance FromJSON CBytes where
+  parseJSON v = let pText = parseJSON v in (CBytes.pack . Text.unpack) <$> pText
 
 data ClientConfig = ClientConfig
   { host         :: CBytes
@@ -94,7 +100,7 @@ main = startClient' =<< Opt.execParser opts
 
 startClient :: ClientConfig -> IO ()
 startClient ClientConfig{..} = do
-  projects <- YAML.readYAMLFile projectsPath
+  projects <- loadConfig (CBytes.unpack projectsPath)
   let logConfig = Log.defaultLoggerConfig {Log.loggerLevel = logLevel}
   Log.setDefaultLogger =<< Log.newFileLogger logConfig logPath
 
@@ -138,6 +144,13 @@ runLangClient (tcpi, tcpo) (stdi, stdo) project = Log.withDefaultLogger $ do
       Buffered.writeBuffer stdo output >> Buffered.flushBuffer stdo
 
 -------------------------------------------------------------------------------
+
+loadConfig :: FilePath -> IO [Project]
+loadConfig fp = do
+  e <- decodeFileEither fp
+  case e of
+    Left ex -> errorWithoutStackTrace (prettyPrintParseException ex)
+    Right x -> pure x
 
 foreverWhen :: IO a -> (a -> Bool) -> B.Builder () -> (a -> IO b) -> IO ()
 foreverWhen res cond !msg f = Log.withDefaultLogger $ do

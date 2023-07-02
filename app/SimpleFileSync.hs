@@ -1,8 +1,10 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Main (main) where
 
@@ -10,83 +12,139 @@ import           Control.Concurrent      (forkIO, threadDelay)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar,
                                           tryPutMVar)
 import           Control.Exception.Safe  (tryAny)
-import           Control.Monad           (unless, void)
+import           Control.Monad
+import           Data.Aeson              (FromJSON)
+import           Data.List               (intercalate)
+import           Data.Maybe              (fromMaybe)
+import           Data.Yaml               (decodeFileEither,
+                                          prettyPrintParseException)
 import           GHC.Generics            (Generic)
-import qualified Z.Data.Builder          as Builder
-import qualified Z.Data.CBytes           as CBytes
-import           Z.Data.JSON             (JSON)
-import           Z.Data.Text             (Text)
-import qualified Z.Data.Text             as Text
-import qualified Z.Data.Vector           as V
-import           Z.Data.YAML             (readYAMLFile)
-import           Z.IO.Environment        (getArgs)
-import           Z.IO.FileSystem         (normalize, watchDirs)
-import qualified Z.IO.Logger             as Log
-import           Z.IO.LowResTimer        (throttleTrailing_)
-import qualified Z.IO.Process            as Proc
+import           System.Console.GetOpt
+import           System.Directory        (canonicalizePath, doesDirectoryExist)
+import           System.Environment      (getArgs)
+import           System.Exit
+import           System.FilePath         (addTrailingPathSeparator, (</>))
+import           System.FilePattern      ((?==))
+import qualified System.FSNotify         as FSN
+import qualified System.FSNotify.Devel   as FSN
+import qualified System.Process          as Proc
+
+-------------------------------------------------------------------------------
 
 data Project = Project
-  { src_path   :: Text
-  , dest_path  :: Text
-  , rsync_opts :: [Text]
-  , ignores    :: [Text]
-  } deriving (Show, Generic, JSON)
+  { src_path   :: !String
+  , dest_path  :: !String
+  , ignores    :: ![String]
+  , rsync_opts :: ![String]
+  , debug      :: !(Maybe Bool)
+  } deriving (Show, Generic, FromJSON)
 
 main :: IO ()
-main = Log.withDefaultLogger $ do
-  argv <- getArgs
-  if length argv /= 2
-     then Log.fatal $ "No sush config file, run "
-                   <> CBytes.toBuilder (head argv) <> " <your-config-file-path>."
-     else do
-       let configPath = argv !! 1
-       config <- readYAMLFile configPath
-       projects <- mapM (\p -> (p, ) <$> newEmptyMVar) config
-       if null projects
-          then Log.fatal "Empty project!"
-          else do
-            Log.info "Starting watching threads..."
-            mapM_ (\(p, f) -> forkIO $ foreverRun $ watchProject f p) projects
-            Log.info "Starting synchronizing threads..."
-            let (first:ps) = projects
-            mapM_ (\(p, f) -> forkIO $ foreverRun $ runRsync f p) ps
-            -- we pick our first project to run on main thread
-            foreverRun $ runRsync (snd first) (fst first)
+main = do
+  (opts, _) <- getOpts =<< getArgs
+  config <- loadConfig (optConfigFile opts)
+  projects <- mapM (\p -> (p, ) <$> newEmptyMVar) config
+  case projects of
+    [] -> errorWithoutStackTrace "Empty project!"
+    (proj:ps) -> FSN.withManager $ \mgr -> do
+      putStrLn "Starting watching threads..."
+      mapM_ (\(p, f) -> watchProject f p mgr) projects
+      putStrLn "Starting synchronizing threads..."
+      mapM_ (\(p, f) -> forkIO $ foreverRun 200000 $ runRsync f p) ps
+      -- we pick our first project to run on main thread
+      foreverRun 200000 $ runRsync (snd proj) (fst proj)
 
-watchProject :: MVar () -> Project -> IO ()
-watchProject flagChange Project{..} = do
-  -- no matter how many FileChange events are popped, we will notify only once
-  -- after (2/10)s.
-  throttledNotify <- throttleTrailing_ 2 (void $ tryPutMVar flagChange ())
-  watchDirs [CBytes.fromText src_path] True $ const throttledNotify
+-------------------------------------------------------------------------------
+
+data Options = Options
+  { optConfigFile :: !FilePath
+  , optHelp       :: !Bool
+  } deriving (Show)
+
+defaultOptions :: Options
+defaultOptions = Options
+  { optConfigFile = "config.yaml"
+  , optHelp = False
+  }
+
+options :: [OptDescr (Options -> Options)]
+options =
+  [ Option ['c'] ["config"]
+      (ReqArg (\arg opts -> opts{ optConfigFile = arg })
+              "FILE")
+      "The config file in yaml format, default is config.yaml"
+  , Option ['h'] ["help"]
+      (NoArg (\opts -> opts{ optHelp = True }))
+      "Print help message"
+  ]
+
+getOpts :: [String] -> IO (Options, [String])
+getOpts argv =
+  case getOpt Permute options argv of
+    (o, n, []  ) -> do
+      let r@(opts, _) = (foldl (flip id) defaultOptions o, n)
+      when (optHelp opts) $ do putStrLn $ usageInfo header options
+                               exitWith ExitSuccess
+      pure r
+    (_, _, errs) -> errorWithoutStackTrace $ concat errs ++ usageInfo header options
+  where
+    header = "Usage: simple-file-sync"
+
+loadConfig :: FilePath -> IO [Project]
+loadConfig fp = do
+  e <- decodeFileEither fp
+  case e of
+    Left ex -> errorWithoutStackTrace (prettyPrintParseException ex)
+    Right x -> pure x
+
+-------------------------------------------------------------------------------
+
+watchProject :: MVar () -> Project -> FSN.WatchManager -> IO ()
+watchProject flagChange Project{..} mgr = do
+  ignores' <- canonicalizeIgnores
+  -- TODO: performance improvements (if needed)
+  void $ FSN.watchTree mgr
+                       src_path
+                       (FSN.allEvents $ \path -> not $ any (?== path) ignores')
+                       (FSN.doAllEvents action)
+  where
+    action path = do
+      when (fromMaybe False debug) $ putStrLn $ "File changed: " <> show path
+      void $ tryPutMVar flagChange ()
+    -- TODO: logic improvements
+    canonicalizeIgnores = do
+      base <- canonicalizePath src_path
+      forM ignores $ \i -> do
+        let i' = base </> i
+        e <- doesDirectoryExist i'
+        if e then pure $ i' </> "**" else pure $ i'
 
 runRsync :: MVar () -> Project -> IO ()
 runRsync flagChange Project{..} = do
-  src_path' <- (<> "/") <$> normalize (CBytes.fromText src_path)     -- add a trailing slash
-  dest_path' <- (<> "/") <$> normalize (CBytes.fromText dest_path)   -- add a trailing slash
+  let srcPath' = addTrailingPathSeparator src_path
+      destPath' = addTrailingPathSeparator dest_path
   let args = ["-azH", "--delete", "--partial"]
-          ++ concatMap (map CBytes.fromText . Text.words) rsync_opts
-          ++ concatMap (\i -> ["--exclude", CBytes.fromText i]) ignores
-          ++ [src_path', dest_path']
+          ++ concatMap (\i -> ["--exclude", i]) ignores
+          ++ concatMap words rsync_opts
+          ++ [srcPath', destPath']
   takeMVar flagChange
-  Log.debug $ "Run command: " <> "rsync "
-           <> CBytes.toBuilder (CBytes.intercalate " " args)
-  (_out, err, _code) <- Proc.readProcess
-    Proc.defaultProcessOptions { Proc.processFile = "rsync"
-                               , Proc.processArgs = args
-                               }
-    ""
-  unless (V.null err) $ Log.fatal $ Builder.bytes err
+  when (fromMaybe False debug) $ putStrLn $ "Run command: " <> "rsync " <> (intercalate " " args)
+  (_code, _out, err) <- Proc.readProcessWithExitCode "rsync" args ""
+  unless (null err) $ putStrLn $ "Run rsync error: " <> err
 
-foreverRun :: IO () -> IO ()
-foreverRun = run (maxN - 1)
+-------------------------------------------------------------------------------
+
+foreverRun :: Int -> IO () -> IO ()
+foreverRun delay = run (maxN - 1)
   where
-    maxN = 60
+    maxN = 60 :: Double
     run 0 _ = error "Error with all retries used!"
-    run n f = do
+    run !n f = do
+      when (delay > 0) (threadDelay delay)
       result <- tryAny f
       case result of
-        Left e -> do Log.fatal $ Builder.stringUTF8 (show e)
-                     threadDelay $ ceiling $ (maxN - n) * log (maxN - n) * 10^6
+        Left e -> do putStrLn $ "foreverRun error: " <> (show e)
+                     -- Retry delay
+                     threadDelay $ ceiling $ (maxN - n) * log (maxN - n) * 1000000
                      run (n - 1) f
         Right _ -> run 60 f

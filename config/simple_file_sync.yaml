@@ -1,9 +1,13 @@
 - src_path: .
   dest_path: /tmp/aaa
+  # files and directories which are ignored for both watch and sync
+  ignores:
+    - "*.eventlog"
+    - stack.yaml.lock
+    - ".git"
+  # extra rsync options
   rsync_opts:
     - --exclude dist-newstyle
     - --exclude local-data
-  # alias for --exclude
-  ignores:
     - --exclude .stack-work
-    - stack.yaml.lock
+  debug: true
