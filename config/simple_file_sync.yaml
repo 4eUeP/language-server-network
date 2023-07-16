@@ -1,9 +1,10 @@
 - src_path: .
   dest_path: /tmp/aaa
-  rsync_opts:
-    - --exclude dist-newstyle
-    - --exclude local-data
-  # alias for --exclude
+  # Only a subset of rsync filter rules is supported
   ignores:
-    - --exclude .stack-work
+    - dist-newstyle
     - stack.yaml.lock
+    - "*.hp"
+  rsync_opts:
+    - --exclude local-data
+    - --exclude .stack-work
